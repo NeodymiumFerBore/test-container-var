@@ -1,3 +1,3 @@
 FROM alpine:latest
 COPY test.txt /test.txt
-apk add curl
+RUN apk add curl
