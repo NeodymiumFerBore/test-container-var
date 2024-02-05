@@ -53,7 +53,8 @@ jobs:
         run: ls -l /
       
       - name: Retrieve file content
-        run: echo "FILE_CONTENT=$(cat /test.txt)" >> $GITHUB_OUTPUT
+        id: assert_file_content
+        run: echo "content=$(cat /test.txt)" >> $GITHUB_OUTPUT
       
       - name: Assert that file content is equal to the image tag
-        run: test "${{ env.FILE_CONTENT }}" == "${{ needs.build.outputs.image_tag }}"
+        run: test "${{ steps.assert_file_content.outputs.content }}" == "${{ needs.build.outputs.image_tag }}"
