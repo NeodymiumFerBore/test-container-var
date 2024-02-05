@@ -1,36 +1,31 @@
 name: Docker
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
 on:
   workflow_dispatch:
   push:
     branches: [ "main" ]
-    # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "main" ]
 
 env:
-  # Use docker.io for Docker Hub if empty
   REGISTRY: docker.io
-  # github.repository as <account>/<repo>
   IMAGE_NAME: ndfeb/testing
 
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
+      # output env vars because next job needs them somewhere where env context is not available
+      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       image_tag: ${{ steps.vars.outputs.sha_short }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+      # We will use this value for our tag: save it as output
+      - name: Compute short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
@@ -46,10 +41,6 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Compute short SHA
-        id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
@@ -58,13 +49,18 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.sha_short }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   test:
     runs-on: ubuntu-latest
     needs: build
     container:
-      image: ndfeb/testing:${{ needs.build.outputs.image_tag }}
+      image: ${{ needs.build.outputs.registry }}/${{ needs.build.outputs.image }}:${{ needs.build.outputs.image_tag }}
     steps:
-      - run: ls -l /
+      - name: Check test.txt is here
+        run: ls -l /
+      
+      - name: Retrieve file content
+        run: echo "FILE_CONTENT=$(cat /test.txt)" >> $GITHUB_OUTPUT
+      
+      - name: Assert that file content is equal to the image tag
+        run: test "${{ env.FILE_CONTENT }}" == "${{ needs.build.outputs.image_tag }}"
