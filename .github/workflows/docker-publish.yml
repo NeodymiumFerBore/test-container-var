@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     container:
-      image: ${{ needs.build.outputs.registry }}/${{ needs.build.outputs.image }}:${{ needs.build.outputs.image_tag }}
+      image: ${{ needs.build.outputs.image }}:${{ needs.build.outputs.image_tag }}
     steps:
       - name: Check test.txt is here
         run: ls -l /
