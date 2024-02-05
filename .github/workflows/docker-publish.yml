@@ -5,23 +5,22 @@ on:
     branches: [ "main" ]
 
 env:
-  REGISTRY: docker.io
   REPOSITORY: ndfeb/testing
 
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
+      # This is what we are going to use to run the next job in our new image
       image_tag: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log into registry ${{ env.REGISTRY }}
+      - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
         uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
         with:
-          registry: ${{ env.REGISTRY }}
           username: ${{ vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
@@ -29,13 +28,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
+          images: ${{ env.REPOSITORY }}
           tags: type=sha,prefix=
 
-      - run: echo "${{ steps.meta.outputs.tags }}"
+      - run: echo "steps.meta.outputs.tags = ${{ steps.meta.outputs.tags }}"
 
       - name: Build and push Docker image
-        id: build-and-push
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
           context: .
@@ -49,12 +47,8 @@ jobs:
     container:
       image: ${{ needs.build.outputs.image_tag }}
     steps:
-      - name: Check test.txt is here
+      - name: Does this look like your image?
         run: ls -l /
-      
-      - name: Retrieve file content
-        id: assert_file_content
-        run: echo "content=$(cat /test.txt)" >> $GITHUB_OUTPUT
-      
-      - name: Assert that file content is equal to the image tag
-        run: test "${{ steps.assert_file_content.outputs.content }}" == "${{ needs.build.outputs.image_tag }}"
+
+      - name: Assert that our test file is here
+        run: test "$(cat /test.txt)" == "Do I exist?"
